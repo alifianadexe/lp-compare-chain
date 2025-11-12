@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import historicalPricesData from "../data/historical-prices.json";
 
 // TypeScript types
 type CoinPrices = {
   [key: string]: number;
+};
+
+type HistoricalData = {
+  [date: string]: CoinPrices;
 };
 
 // CoinGecko API IDs
@@ -79,25 +84,24 @@ export default function Page() {
   const fetchHistoricalPrices = async (date: string) => {
     setLoadingHistorical(true);
     try {
-      // Convert date to DD-MM-YYYY format for CoinGecko
-      const dateObj = new Date(date);
-      const day = String(dateObj.getDate()).padStart(2, "0");
-      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-      const year = dateObj.getFullYear();
-      const formattedDate = `${day}-${month}-${year}`;
+      // Load from local JSON file
+      const data = historicalPricesData as HistoricalData;
 
-      const historicalData: CoinPrices = {};
-
-      // Fetch historical data for each coin
-      for (const [symbol, id] of Object.entries(COIN_IDS)) {
-        const response = await fetch(
-          `https://api.coingecko.com/api/v3/coins/${id}/history?date=${formattedDate}`
-        );
-        const data = await response.json();
-        historicalData[symbol] = data.market_data?.current_price?.usd || 0;
+      // Check if we have data for this exact date
+      if (data[date]) {
+        setHistoricalPrices(data[date]);
+      } else {
+        // Find the closest date
+        const dates = Object.keys(data).sort();
+        const closestDate = dates.reduce((prev, curr) => {
+          return Math.abs(new Date(curr).getTime() - new Date(date).getTime()) <
+            Math.abs(new Date(prev).getTime() - new Date(date).getTime())
+            ? curr
+            : prev;
+        });
+        setHistoricalPrices(data[closestDate]);
       }
 
-      setHistoricalPrices(historicalData);
       setLoadingHistorical(false);
     } catch (error) {
       console.error("Error fetching historical prices:", error);
@@ -410,150 +414,249 @@ export default function Page() {
         </div>
 
         {/* Matrix Comparison Table */}
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border-2 border-gray-300">
-          {/* Date Picker - Top Left */}
-          <div className="bg-gray-100 px-8 py-4 border-b-2 border-gray-300 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-semibold text-gray-700">
-                Compare with:
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={handleDateChange}
-                max={new Date().toISOString().split("T")[0]}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900"
-              />
-              {loadingHistorical && (
-                <span className="text-sm text-gray-600">Loading...</span>
-              )}
+        <div className="space-y-8">
+          {/* Current Prices Matrix */}
+          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border-2 border-gray-300">
+            <div className="bg-gray-100 px-8 py-4 border-b-2 border-gray-300">
+              <h3 className="text-xl font-bold text-gray-900">
+                Current Prices (Live)
+              </h3>
             </div>
-            {selectedDate && !loadingHistorical && (
-              <span className="text-sm text-gray-600">
-                Comparing current prices with{" "}
-                {new Date(selectedDate).toDateString()}
-              </span>
-            )}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-900">
+                    <th className="px-8 py-6 text-left text-2xl font-bold text-white border-r-2 border-gray-700">
+                      Pair Ratio
+                    </th>
+                    {coins.map((coin) => (
+                      <th
+                        key={coin}
+                        className="px-8 py-6 text-center border-r-2 border-gray-700 last:border-r-0"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <img
+                            src={
+                              TOKEN_STYLES[coin as keyof typeof TOKEN_STYLES]
+                                .logo
+                            }
+                            alt={coin}
+                            className="w-8 h-8 rounded-full"
+                          />
+                          <span className="text-2xl font-bold text-white">
+                            {coin}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {coins.map((rowCoin, rowIndex) => (
+                    <tr
+                      key={rowCoin}
+                      className={`${
+                        rowIndex % 2 === 0 ? "bg-gray-50" : "bg-white"
+                      } hover:bg-blue-50 transition-colors`}
+                    >
+                      <td className="px-8 py-6 border-r-2 border-gray-300 bg-gray-100">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={
+                              TOKEN_STYLES[rowCoin as keyof typeof TOKEN_STYLES]
+                                .logo
+                            }
+                            alt={rowCoin}
+                            className="w-8 h-8 rounded-full"
+                          />
+                          <span
+                            className={`text-2xl font-bold ${
+                              TOKEN_STYLES[rowCoin as keyof typeof TOKEN_STYLES]
+                                .color
+                            }`}
+                          >
+                            {rowCoin}
+                          </span>
+                        </div>
+                      </td>
+                      {coins.map((colCoin) => {
+                        const ratio = calculateRatio(rowCoin, colCoin, prices);
+                        const isDiagonal = rowCoin === colCoin;
+
+                        return (
+                          <td
+                            key={colCoin}
+                            className={`px-8 py-6 text-center border-r-2 border-gray-200 last:border-r-0 ${
+                              isDiagonal
+                                ? "bg-gray-200 text-gray-500"
+                                : "text-gray-900"
+                            }`}
+                          >
+                            <div className="text-xl font-semibold">
+                              {loading ? "..." : ratio}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-900">
-                  <th className="px-8 py-6 text-left text-2xl font-bold text-white border-r-2 border-gray-700">
-                    Pair Ratio
-                  </th>
-                  {coins.map((coin) => (
-                    <th
-                      key={coin}
-                      className="px-8 py-6 text-center border-r-2 border-gray-700 last:border-r-0"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <img
-                          src={
-                            TOKEN_STYLES[coin as keyof typeof TOKEN_STYLES].logo
-                          }
-                          alt={coin}
-                          className="w-8 h-8 rounded-full"
-                        />
-                        <span className="text-2xl font-bold text-white">
-                          {coin}
-                        </span>
-                      </div>
+          {/* Historical Prices Matrix */}
+          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border-2 border-blue-300">
+            <div className="bg-blue-100 px-8 py-4 border-b-2 border-blue-300 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h3 className="text-xl font-bold text-gray-900">
+                  Historical Prices
+                </h3>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                  max={new Date().toISOString().split("T")[0]}
+                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900"
+                />
+                {loadingHistorical && (
+                  <span className="text-sm text-gray-600">Loading...</span>
+                )}
+              </div>
+              {selectedDate && !loadingHistorical && (
+                <span className="text-sm text-gray-600">
+                  {new Date(selectedDate).toDateString()}
+                </span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-blue-900">
+                    <th className="px-8 py-6 text-left text-2xl font-bold text-white border-r-2 border-blue-700">
+                      Pair Ratio
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {coins.map((rowCoin, rowIndex) => (
-                  <tr
-                    key={rowCoin}
-                    className={`${
-                      rowIndex % 2 === 0 ? "bg-gray-50" : "bg-white"
-                    } hover:bg-blue-50 transition-colors`}
-                  >
-                    <td className="px-8 py-6 border-r-2 border-gray-300 bg-gray-100">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={
-                            TOKEN_STYLES[rowCoin as keyof typeof TOKEN_STYLES]
-                              .logo
-                          }
-                          alt={rowCoin}
-                          className="w-8 h-8 rounded-full"
-                        />
-                        <span
-                          className={`text-2xl font-bold ${
-                            TOKEN_STYLES[rowCoin as keyof typeof TOKEN_STYLES]
-                              .color
-                          }`}
-                        >
-                          {rowCoin}
-                        </span>
-                      </div>
-                    </td>
-                    {coins.map((colCoin) => {
-                      const ratio = calculateRatio(rowCoin, colCoin, prices);
-                      const isDiagonal = rowCoin === colCoin;
-                      const changePercent = calculateChange(rowCoin, colCoin);
-                      const hasComparison =
-                        Object.keys(historicalPrices).length > 0;
-
-                      // Determine background color based on change percentage
-                      let bgColor = "";
-                      if (hasComparison && !isDiagonal) {
-                        if (changePercent > 0) {
-                          // Green shades for positive changes
-                          if (changePercent > 20) bgColor = "bg-green-200";
-                          else if (changePercent > 10) bgColor = "bg-green-100";
-                          else if (changePercent > 0) bgColor = "bg-green-50";
-                        } else if (changePercent < 0) {
-                          // Red shades for negative changes
-                          if (changePercent < -20) bgColor = "bg-red-200";
-                          else if (changePercent < -10) bgColor = "bg-red-100";
-                          else if (changePercent < 0) bgColor = "bg-red-50";
-                        }
-                      }
-
-                      return (
-                        <td
-                          key={colCoin}
-                          className={`px-8 py-6 text-center border-r-2 border-gray-200 last:border-r-0 ${
-                            isDiagonal
-                              ? "bg-gray-200 text-gray-500"
-                              : bgColor || "text-gray-900"
-                          }`}
-                        >
-                          <div className="text-xl font-semibold">
-                            {loading ? "..." : ratio}
-                          </div>
-                          {hasComparison && !isDiagonal && (
-                            <div
-                              className={`text-sm font-bold mt-1 ${
-                                changePercent > 0
-                                  ? "text-green-700"
-                                  : changePercent < 0
-                                  ? "text-red-700"
-                                  : "text-gray-500"
-                              }`}
-                            >
-                              {changePercent > 0
-                                ? "▲"
-                                : changePercent < 0
-                                ? "▼"
-                                : ""}
-                              {changePercent !== 0
-                                ? ` ${Math.abs(changePercent).toFixed(2)}%`
-                                : " 0.00%"}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
+                    {coins.map((coin) => (
+                      <th
+                        key={coin}
+                        className="px-8 py-6 text-center border-r-2 border-blue-700 last:border-r-0"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <img
+                            src={
+                              TOKEN_STYLES[coin as keyof typeof TOKEN_STYLES]
+                                .logo
+                            }
+                            alt={coin}
+                            className="w-8 h-8 rounded-full"
+                          />
+                          <span className="text-2xl font-bold text-white">
+                            {coin}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {coins.map((rowCoin, rowIndex) => (
+                    <tr
+                      key={rowCoin}
+                      className={`${
+                        rowIndex % 2 === 0 ? "bg-blue-50" : "bg-white"
+                      } hover:bg-blue-100 transition-colors`}
+                    >
+                      <td className="px-8 py-6 border-r-2 border-blue-300 bg-blue-100">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={
+                              TOKEN_STYLES[rowCoin as keyof typeof TOKEN_STYLES]
+                                .logo
+                            }
+                            alt={rowCoin}
+                            className="w-8 h-8 rounded-full"
+                          />
+                          <span
+                            className={`text-2xl font-bold ${
+                              TOKEN_STYLES[rowCoin as keyof typeof TOKEN_STYLES]
+                                .color
+                            }`}
+                          >
+                            {rowCoin}
+                          </span>
+                        </div>
+                      </td>
+                      {coins.map((colCoin) => {
+                        const ratio = calculateRatio(
+                          rowCoin,
+                          colCoin,
+                          historicalPrices
+                        );
+                        const isDiagonal = rowCoin === colCoin;
+                        const changePercent = calculateChange(rowCoin, colCoin);
+                        const hasComparison =
+                          Object.keys(historicalPrices).length > 0;
+
+                        // Determine background color based on change percentage
+                        let bgColor = "";
+                        if (hasComparison && !isDiagonal) {
+                          if (changePercent > 0) {
+                            // Green shades for positive changes
+                            if (changePercent > 20) bgColor = "bg-green-200";
+                            else if (changePercent > 10)
+                              bgColor = "bg-green-100";
+                            else if (changePercent > 0) bgColor = "bg-green-50";
+                          } else if (changePercent < 0) {
+                            // Red shades for negative changes
+                            if (changePercent < -20) bgColor = "bg-red-200";
+                            else if (changePercent < -10)
+                              bgColor = "bg-red-100";
+                            else if (changePercent < 0) bgColor = "bg-red-50";
+                          }
+                        }
+
+                        return (
+                          <td
+                            key={colCoin}
+                            className={`px-8 py-6 text-center border-r-2 border-blue-200 last:border-r-0 ${
+                              isDiagonal
+                                ? "bg-gray-200 text-gray-500"
+                                : bgColor || "text-gray-900"
+                            }`}
+                          >
+                            <div className="text-xl font-semibold">
+                              {loadingHistorical || !hasComparison
+                                ? "..."
+                                : ratio}
+                            </div>
+                            {hasComparison && !isDiagonal && (
+                              <div
+                                className={`text-sm font-bold mt-1 ${
+                                  changePercent > 0
+                                    ? "text-green-700"
+                                    : changePercent < 0
+                                    ? "text-red-700"
+                                    : "text-gray-500"
+                                }`}
+                              >
+                                {changePercent > 0
+                                  ? "▲"
+                                  : changePercent < 0
+                                  ? "▼"
+                                  : ""}
+                                {changePercent !== 0
+                                  ? ` ${Math.abs(changePercent).toFixed(2)}%`
+                                  : " 0.00%"}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
