@@ -382,6 +382,22 @@ export default function Page() {
           <span className="text-gray-400">|</span>
           <div className="flex items-center gap-2">
             <img
+              src={TOKEN_STYLES.SUI.logo}
+              alt="SUI"
+              className="w-6 h-6 rounded-full"
+            />
+            <span className="font-semibold">
+              <span className={TOKEN_STYLES.SUI.color}>SUI</span>
+              <span className="text-gray-400">/</span>
+              <span className={TOKEN_STYLES.HYPE.color}>HYPE</span>:
+            </span>
+            <span>
+              {loading ? "..." : calculateRatio("SUI", "HYPE", prices)}
+            </span>
+          </div>
+          <span className="text-gray-400">|</span>
+          <div className="flex items-center gap-2">
+            <img
               src={TOKEN_STYLES.SOL.logo}
               alt="SOL"
               className="w-6 h-6 rounded-full"
@@ -398,6 +414,22 @@ export default function Page() {
           <span className="text-gray-400">|</span>
           <div className="flex items-center gap-2">
             <img
+              src={TOKEN_STYLES.HYPE.logo}
+              alt="HYPE"
+              className="w-6 h-6 rounded-full"
+            />
+            <span className="font-semibold">
+              <span className={TOKEN_STYLES.HYPE.color}>HYPE</span>
+              <span className="text-gray-400">/</span>
+              <span className={TOKEN_STYLES.SOL.color}>SOL</span>:
+            </span>
+            <span>
+              {loading ? "..." : calculateRatio("HYPE", "SOL", prices)}
+            </span>
+          </div>
+          <span className="text-gray-400">|</span>
+          <div className="flex items-center gap-2">
+            <img
               src={TOKEN_STYLES.SOL.logo}
               alt="SOL"
               className="w-6 h-6 rounded-full"
@@ -409,6 +441,22 @@ export default function Page() {
             </span>
             <span>
               {loading ? "..." : calculateRatio("SOL", "SUI", prices)}
+            </span>
+          </div>{" "}
+          <span className="text-gray-400">|</span>
+          <div className="flex items-center gap-2">
+            <img
+              src={TOKEN_STYLES.SUI.logo}
+              alt="SUI"
+              className="w-6 h-6 rounded-full"
+            />
+            <span className="font-semibold">
+              <span className={TOKEN_STYLES.SUI.color}>SUI</span>
+              <span className="text-gray-400">/</span>
+              <span className={TOKEN_STYLES.SOL.color}>SOL</span>:
+            </span>
+            <span>
+              {loading ? "..." : calculateRatio("SUI", "SOL", prices)}
             </span>
           </div>
         </div>
